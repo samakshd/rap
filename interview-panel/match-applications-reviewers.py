@@ -8,7 +8,7 @@ import functools
 import min_cost_max_flow as MinCostMaxFlow
 
 PANEL_SIZE = 3
-MAX_PANELS_PER_FACULTY = 100
+MAX_PANELS_PER_FACULTY = 150
 ##################################################################################
 def read_contents(fileName):
   if(not os.path.isfile(fileName)):
@@ -308,14 +308,50 @@ def create_review_panels_to_file(review_panels):
   for app in review_panels:
     count+=1
     fout.write(str(app)+",")
-    panel = functools.reduce(lambda x, y: x + y[0] + ",",review_panels[app][:PANEL_SIZE],"")
-    # print(review_panels[app][:PANEL_SIZE])
+    panel = functools.reduce(lambda x, y: x + y[0] + ",",review_panels[app],"")
+
     k=str(panel)
     fout.write(k[:-1])
     fout.write("\n")
   fout.close()
 
+
+def create_manual_review_panels_to_file(manual_review_panels):
+  data = []
+  for app in manual_review_panels:
+    row = []
+    row.append(app)
+    for fac in manual_review_panels[app]:
+      row.append(fac)
+    data.append(row)
+
+  with open("data/output/panel/manual-review-panels.csv", 'w', newline='') as f:
+    writer = csv.writer(f)
+    writer.writerows(data)
+
 ##################################################################################
+
+def get_manual_review_panels(contents,application_list):
+  apps_init = [row[0] for row in contents]
+  facs_init = [row[1] for row in contents]
+  apps = []
+  facs = []
+
+
+  
+  for i in range(len(apps_init)):
+    if(apps_init[i] in application_list):
+      apps.append(apps_init[i])
+      facs.append(facs_init[i])
+  
+
+  manual_review_panels = {}
+  for i in range(len(apps)):
+    if(apps[i] not in manual_review_panels):
+      manual_review_panels[apps[i]] = []
+    manual_review_panels[apps[i]].append(facs[i])
+  
+  return manual_review_panels
 
 ##################################################################################
 def get_candidate_relevance_index(review_panels):
@@ -329,6 +365,30 @@ def get_candidate_relevance_index(review_panels):
   return candidate_relevance_index
 
 ##################################################################################
+
+def get_total_match_score(review_panels):
+
+  total_score = 0
+  for app in review_panels:
+    for (fac,score) in review_panels[app]:
+      total_score += score
+
+  return total_score
+
+def get_total_manual_match_score(fac_apps,review_panels):
+
+  faculty_score, application_score, topic_score = calculate_scores(fac_apps)
+  scores_map = get_scores_map(fac_apps,faculty_score, application_score, topic_score)
+
+
+  total_score = 0
+  for app in review_panels:
+    for fac in review_panels[app]:
+      if((fac,app) in scores_map):
+        total_score += scores_map[(fac,app)]
+
+  return total_score
+
 
 ##################################################################################
 
@@ -393,6 +453,12 @@ if __name__ == "__main__":
   create_review_panels_to_file(review_panels)
   for fac in faculty_load:
     print_referral_to_file(fac, faculty_load[fac])
+
+  manual_review_panels = get_manual_review_panels(read_contents("data/input/manualData.csv"),application_topics)
+  create_manual_review_panels_to_file(manual_review_panels)
+
+  print(get_total_manual_match_score(all_fac_apps,manual_review_panels))
+  print(get_total_match_score(review_panels))
 
   candidate_relevance_index = get_candidate_relevance_index(review_panels)
   faculty_relevance_index = get_faculty_relevance_index(all_fac_apps,faculty_load)
